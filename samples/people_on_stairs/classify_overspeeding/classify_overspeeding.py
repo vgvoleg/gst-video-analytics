@@ -13,20 +13,20 @@ import time
 import numpy as np
 from copy import copy
 MODEL_PATH = '/root/Projects/models/intel/person-detection-retail-0013/FP32/person-detection-retail-0013.xml'
-DATASET_PATH = "/root/Projects/train/"
+DATASET_PATH = "/root/Projects/val/"
 ALPHA = 0.1
 ALPHA_HW = 0.01
 RES_PATH='/root/Projects/gst-video-analytics-0.7.0/samples/people_on_stairs/classify_overspeeding/res.json'
 
 
-SVM_PATH = '/root/Projects/models/overspeed_classify/RF_classifier.sav'
+SVM_PATH = '/root/Projects/models/overspeed_classify/SVM_Classifier_without_interval.sav'
 
 IDENTIFY_PIPELINE_TEMPLATE = """gst-launch-1.0 filesrc \
         location={} \
         ! decodebin  ! videoconvert ! video/x-raw,format=BGRx ! gvadetect  \
-        model={} \
+        model={} ! queue  \
         ! gvaspeedometer alpha={} alpha-hw={} interval=0.03333333 \
-        ! gvapython module={} class=OverspeedClassifier   \
+        ! queue ! gvapython module={} class=OverspeedClassifier   \
         ! fakesink sync=false"""
 
 
@@ -45,7 +45,7 @@ class OverspeedClassifier():
         for region in frame.regions():
             for tensor in region.tensors():
                 if tensor.has_field("velocity"):
-                    print(tensor['velocity'])
+                    # print(tensor)
                     self.velocities.append(tensor['velocity'])
 
  
@@ -59,8 +59,8 @@ class OverspeedClassifier():
                       write_file, indent=4, sort_keys=True)
 
     def __dump_data(self):
-        with open(self._result_path, "w") as write_file:
-            write_file.write("{} \t".format(self.velocities))
+        with open(self._result_path, "a") as write_file:
+            write_file.write("{} \n".format(self.velocities))
 
 
 if __name__ == "__main__":
@@ -91,7 +91,7 @@ if __name__ == "__main__":
                 velocity = np.array(_raw_result)
 
                 hist, bin_edges = np.histogram(velocity, bins=20)
-                norm = np.linalg.norm(hist) + 1e-6
+                norm = np.linalg.norm(hist) # + 1e-6
                 hist = hist.astype(np.float32)
 
                 hist /= norm
@@ -99,13 +99,13 @@ if __name__ == "__main__":
 
                 y_pred = svclassifier.predict_proba(hist)
 
-                y_pred = True if y_pred[0, 1] >= 0.3 else False
+                y_pred = True if y_pred[0, 1] >= 0.4489 else False
                 pred_file = video_path.replace(".mp4", 'predict.txt')
                 if y_pred:
-                    with open(pred_file, 'a') as f:
+                    with open(pred_file, 'w') as f:
                         f.write("Current ID violates speed limit\n")
                 else:
-                    with open(pred_file, 'a') as f:
+                    with open(pred_file, 'w') as f:
                         f.write("Current ID does not violate speed limit\n")
             
                 # velocity = np.array(velocities)
