@@ -13,31 +13,28 @@ import time
 import numpy as np
 from copy import copy
 MODEL_PATH = '/root/Projects/models/intel/person-detection-retail-0013/FP32/person-detection-retail-0013.xml'
-DATASET_PATH = "/root/Projects/val/"
+DATASET_PATH = "/root/Projects/train/"
 ALPHA = 0.1
 ALPHA_HW = 0.01
 RES_PATH='/root/Projects/gst-video-analytics-0.7.0/samples/people_on_stairs/classify_overspeeding/res.json'
+THRES=0.16326530612244897
 
-
-SVM_PATH = '/root/Projects/models/overspeed_classify/SVM_Classifier_without_interval.sav'
+SVM_PATH = '/root/Projects/models/overspeed_classify/SVN_classifier_data_from_meta_f1_92.sav'
 
 IDENTIFY_PIPELINE_TEMPLATE = """gst-launch-1.0 filesrc \
         location={} \
         ! decodebin  ! videoconvert ! video/x-raw,format=BGRx ! gvadetect  \
         model={} ! queue  \
         ! gvaspeedometer alpha={} alpha-hw={} interval=0.03333333 \
-        ! queue ! gvapython module={} class=OverspeedClassifier   \
+        ! gvapython module={} class=OverspeedClassifier arg=[\\"{}\\"]   \
         ! fakesink sync=false"""
 
 
 class OverspeedClassifier():
-    def __init__(self):
-        print("Initializing python OverspeedClassifier module")
-        print(MODEL_PATH)
-        
-        print("Classification model loaded")
+    def __init__(self, out_path=RES_PATH):
+ 
         self.velocities = []
-        self._result_path = RES_PATH
+        self._result_path = out_path
         self.frames_processed = 0
 
     def process_frame(self, frame):
@@ -45,7 +42,7 @@ class OverspeedClassifier():
         for region in frame.regions():
             for tensor in region.tensors():
                 if tensor.has_field("velocity"):
-                    # print(tensor)
+                    # print("After meta : {}".format(tensor))
                     self.velocities.append(tensor['velocity'])
 
  
@@ -65,7 +62,7 @@ class OverspeedClassifier():
 
 if __name__ == "__main__":
     svclassifier = pickle.load(open(SVM_PATH, 'rb'))
-    result_path = 'res.txt'
+    # result_path = 'res.txt'
     for file_name in listdir(DATASET_PATH):
         if file_name.endswith(".mp4"):
             video_path = join(DATASET_PATH, file_name)
@@ -75,64 +72,38 @@ if __name__ == "__main__":
                 ALPHA,
                 ALPHA_HW,
                 realpath(__file__),
-                
+                # RES_PATH,
+                join(DATASET_PATH, file_name.replace('.mp4', '.json'))
             )
             print(pipeline_str)
             proc = subprocess.run(
                 shlex.split(pipeline_str), env=environ.copy())
 
-            with open("classify_overspeed.txt", 'a') as f:
-                f.write("{} evaluated\n".format(file_name))
+            # with open("classify_overspeed.txt", 'a') as f:
+            #     f.write("{} evaluated\n".format(file_name))
             if proc.returncode != 0:
                 print("Error while running pipeline")
                 exit(-1)
-            with open(RES_PATH, "r") as pr_res_file:
-                _raw_result = json.load(pr_res_file)
-                velocity = np.array(_raw_result)
 
-                hist, bin_edges = np.histogram(velocity, bins=20)
-                norm = np.linalg.norm(hist) # + 1e-6
-                hist = hist.astype(np.float32)
+            # with open(RES_PATH, "r") as pr_res_file:
+            #     _raw_result = json.load(pr_res_file)
+            #     velocity = np.array(_raw_result)
 
-                hist /= norm
-                hist = hist.reshape(1, len(hist))
+            #     hist, bin_edges = np.histogram(velocity, bins=20, density=True)
+            #     # norm = np.linalg.norm(hist) # + 1e-6
+            #     # hist = hist.astype(np.float32)
 
-                y_pred = svclassifier.predict_proba(hist)
+            #     # hist /= norm
+            #     hist = hist.reshape(1, len(hist))
 
-                y_pred = True if y_pred[0, 1] >= 0.4489 else False
-                pred_file = video_path.replace(".mp4", 'predict.txt')
-                if y_pred:
-                    with open(pred_file, 'w') as f:
-                        f.write("Current ID violates speed limit\n")
-                else:
-                    with open(pred_file, 'w') as f:
-                        f.write("Current ID does not violate speed limit\n")
+            #     y_pred = svclassifier.predict_proba(hist)
+
+            #     y_pred = True if y_pred[0, 1] >= THRES else False
+            #     pred_file = video_path.replace(".mp4", 'predict.txt')
+            #     if y_pred:
+            #         with open(pred_file, 'w') as f:
+            #             f.write("Current ID violates speed limit\n")
+            #     else:
+            #         with open(pred_file, 'w') as f:
+            #             f.write("Current ID does not violate speed limit\n")
             
-                # velocity = np.array(velocities)
-
-                # hist, bin_edges = np.histogram(velocity, bins=20)
-                # norm = np.linalg.norm(hist) + 1e-6
-                # hist = hist.astype(np.float32)
-
-                # for i, elem in enumerate(hist):
-                #     hist[i] = float(elem) / norm
-                # hist = hist.reshape(1, len(hist))
-
-                # y_pred = self.svclassifier.predict_proba(hist)
-
-                # y_pred = True if y_pred[0, 1] >= 0.3 else False
-                # if y_pred:
-                #     with open("classify_overspeed.txt", 'a') as f:
-                #         f.write("Current ID violates speed limit\n")
-                # else:
-                #     with open("classify_overspeed.txt", 'a') as f:
-                #         f.write("Current ID does not violate speed limit\n")
-                # self.velocities = []
-
-            # print(str(proc.stdout))
-            # if 'does not violate' in str(proc.stdout) and 'fast' in file_name:
-            #     FN += 1
-            # if 'violates' in str(proc.stdout) and 'fast' in file_name:
-            #     TP += 1
-            # if 'violates' in str(proc.stdout) and 'regular' in file_name:
-            #     FP += 1
