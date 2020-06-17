@@ -21,6 +21,7 @@
 
 #define UNUSED(x) (void)(x)
 #define BB_SIZE 4
+#define VEL_EPS 1e-8
 
 // TODO: make config
 
@@ -118,14 +119,15 @@ class IterativeSpeedometer : public Speedometer {
                 gdouble d_bb = sqrt((cur_x_center - prev_bb.first) * (cur_x_center - prev_bb.first) +
                                     (cur_y_center - prev_bb.second) * (cur_y_center - prev_bb.second));
                 velocity = d_bb / interval;
-                // fprintf(stdout, "%f\t", velocity);
-                velocities[object_id].push_back(velocity);
+                // fprintf(stdout, "Before meta %f\n", velocity);
+                // g_print("g_print %f\n", velocity);
+                // velocities[object_id].push_back(velocity);
                 prev_centers_bb[object_id] = std::pair<uint32_t, uint32_t>(cur_x_center, cur_y_center);
 
                 auto result_meta = roi.add_tensor("Velocity");
-                result_meta.set_double("velocity", velocity);
+                result_meta.set_double("velocity", velocity + VEL_EPS);
                 result_meta.set_int("id", object_id);
-                // result_meta.set_double("avg_velocity", avg_speed);
+                // result_meta.set_double("s", avg_speed);
             }
         }
 
