@@ -9,14 +9,14 @@ import time
 import numpy as np
 from copy import copy
 
-MODEL_PATH = """/root/Projects/models/intel/person-detection-retail-0013/FP32
-                /person-detection-retail-0013.xml"""
+MODEL_PATH = ("/root/Projects/models/intel/person-detection-retail-0013/FP32"
+                "/person-detection-retail-0013.xml")
 
 DATASET_PATH = "/root/Projects/train/"
 ALPHA = 0.1
 ALPHA_HW = 0.01
-RES_PATH = """/root/Projects/gst-video-analytics-0.7.0/samples/
-            people_on_stairs/classify_overspeeding/res.json"""
+RES_PATH = ("/root/Projects/gst-video-analytics-0.7.0/samples/"
+            "people_on_stairs/classify_overspeeding/res.json")
 
 SVM_PATH = '/root/Projects/models/overspeed_classify/SVM_Classifier_without_interval.sav'
 
