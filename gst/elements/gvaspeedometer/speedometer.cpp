@@ -21,6 +21,7 @@
 
 #define UNUSED(x) (void)(x)
 #define BB_SIZE 4
+#define VEL_EPS 1e-8
 
 // TODO: make config
 
@@ -93,11 +94,6 @@ class IterativeSpeedometer : public Speedometer {
                 violations[object_id] = false;
 
             } else {
-                // second and other detections
-                auto now = std::chrono::high_resolution_clock::now();
-                if (!last_time.time_since_epoch().count()) {
-                    last_time = now;
-                }
                 auto prev_bb_coords = prev_bb[object_id];
 
                 auto new_x = static_cast<uint32_t>(
@@ -117,50 +113,21 @@ class IterativeSpeedometer : public Speedometer {
                 bbox.h = new_h;
                 bbox.w = new_w;
                 prev_bb[object_id] = {new_x, new_y, new_h, new_w};
-
-                gdouble sec = std::chrono::duration_cast<seconds_double>(now - last_time).count();
-                if (sec >= interval) {
-
-                    last_time = now;
-
-                    auto prev_bb = prev_centers_bb[object_id];
-                    uint32_t cur_x_center = bbox.x + bbox.w / 2;
-                    uint32_t cur_y_center = bbox.y + bbox.h / 2;
-                    // auto cur_bb = std::pair<int, int> (cur_x_center, cur_y_center)
-                    // auto smothed_bb = std::pair<int, int> (prev_bb.first + ALPHA * (cur_x_center - prev_bb.first),
-                    //         prev_bb.second + ALPHA * (cur_x_center - prev_bb.second) )
-                    gdouble d_bb = sqrt((cur_x_center - prev_bb.first) * (cur_x_center - prev_bb.first) +
-                                        (cur_y_center - prev_bb.second) * (cur_y_center - prev_bb.second));
-                    // gdouble d_bb = sqrt( (smothed_bb.first - prev_bb.first) * (smothed_bb.first - prev_bb.first) +
-                    //      (smothed_bb.second - prev_bb.second) * (smothed_bb.second - prev_bb.second) );
-                    velocity = d_bb / interval;
-                    // fprintf(stdout, "%f\t", velocity);
-                    velocities[object_id].push_back(velocity);
-                    // PrintSpeed(stdout, object_id, velocity);
-                    prev_centers_bb[object_id] = std::pair<uint32_t, uint32_t>(cur_x_center, cur_y_center);
-                    avg_speed = CalcAverageSpeed(object_id);
-                    if (avg_speed >= speedlimit) {
-                        // fprintf(stdout, "Average speed of id %d = %f \n", object_id, avg_speed);
-                        violations_num[object_id] += 1;
-                    }
-                    if (violations_num[object_id] >= speedlimit_violations) {
-                        // if (!violations[object_id])
-                        //     fprintf(stdout, "Warning! Id %d possibly violates speed limit \n", object_id);
-                        violations[object_id] = true;
-                    }
-
-                } else if (!velocities[object_id].empty()) {
-                    velocity = velocities[object_id].back();
-                    avg_speed = CalcAverageSpeed(object_id);
-
-                } else {
-                    avg_speed = 0;
-                }
+                auto prev_bb = prev_centers_bb[object_id];
+                uint32_t cur_x_center = bbox.x + bbox.w / 2;
+                uint32_t cur_y_center = bbox.y + bbox.h / 2;
+                gdouble d_bb = sqrt((cur_x_center - prev_bb.first) * (cur_x_center - prev_bb.first) +
+                                    (cur_y_center - prev_bb.second) * (cur_y_center - prev_bb.second));
+                velocity = d_bb / interval;
+                // fprintf(stdout, "Before meta %f\n", velocity);
+                // g_print("g_print %f\n", velocity);
+                // velocities[object_id].push_back(velocity);
+                prev_centers_bb[object_id] = std::pair<uint32_t, uint32_t>(cur_x_center, cur_y_center);
 
                 auto result_meta = roi.add_tensor("Velocity");
-                result_meta.set_double("velocity", velocity);
+                result_meta.set_double("velocity", velocity + VEL_EPS);
                 result_meta.set_int("id", object_id);
-                result_meta.set_double("avg_velocity", avg_speed);
+                // result_meta.set_double("s", avg_speed);
             }
         }
 
